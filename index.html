@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Escáner QR | Mi Restaurante</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{--bg:#150b05;--gold:#e9c46a;--cream:#f6ead6;--muted:#bfa27a;--green:#4be08f;--red:#ff8a7a}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px 14px;color:var(--cream);font:16px Arial,sans-serif;background:radial-gradient(600px 400px at 15% 0%,#563416,transparent 70%),var(--bg);display:flex;justify-content:center;align-items:center}
+.panel{width:100%;max-width:520px;border:1px solid #80602b;border-radius:24px;padding:26px;background:rgba(255,255,255,.04);box-shadow:0 20px 55px #0008}
+h1{color:var(--gold);margin:0 0 8px;font-size:1.8rem}p{color:var(--muted);line-height:1.5}
+label{display:block;margin:16px 0 7px;color:var(--gold);font-size:.9rem}
+input{width:100%;padding:13px;border-radius:12px;border:1px solid #70552b;background:#100803;color:#fff;font-size:1rem}
+button{width:100%;padding:14px;border:0;border-radius:30px;background:linear-gradient(135deg,#fff0b8,#e9c46a,#b9862e);color:#2a1608;font-weight:bold;font-size:1rem;cursor:pointer;margin-top:14px}
+button:disabled{opacity:.55;cursor:wait}
+#reader{margin-top:16px;overflow:hidden;border-radius:16px;background:#050302}
+#status{margin-top:15px;padding:13px;border-radius:12px;display:none;line-height:1.45;overflow-wrap:anywhere}
+#status.ok{display:block;background:#163c29;border:1px solid var(--green);color:#d8ffe8}
+#status.err{display:block;background:#401d18;border:1px solid var(--red);color:#ffe4df}
+.small{font-size:.8rem;color:#9e8666}
+</style>
+</head>
+<body>
+<main class="panel">
+<h1>Escáner de fidelización</h1>
+<p>Escanea el QR de la tarjeta del cliente. El sello se registrará en tu sistema de Google Apps Script.</p>
+
+<label for="webapp">URL de implementación de Apps Script</label>
+<input id="webapp" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="url">
+
+<label for="clave">Clave del personal</label>
+<input id="clave" type="password" placeholder="Ingresa la clave de sellado" autocomplete="current-password">
+
+<button id="start">📷 Iniciar escáner</button>
+<div id="reader"></div>
+<div id="status" role="status"></div>
+<p class="small">La cámara requiere HTTPS y permiso del navegador. La clave se envía mediante POST al sistema; no se incluye en la URL.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let lector=null,activo=false,procesando=false;
+try{$('webapp').value=localStorage.getItem('appScriptWebApp')||'';}catch(e){}
+
+function mensaje(texto,tipo='err'){
+  $('status').className=tipo;
+  $('status').textContent=texto;
+}
+function extraerCodigo(texto){
+  // El QR actual de la tarjeta contiene la URL de Apps Script con ?page=escanear&codigo=...
+  try{
+    const u=new URL(texto);
+    const codigo=u.searchParams.get('codigo');
+    if(codigo)return codigo.trim().toUpperCase();
+  }catch(e){}
+  // También acepta QR que contenga directamente el código tipo AB-1234
+  const m=texto.trim().match(/[A-Z]{2}-\d{4}/i);
+  return m?m[0].toUpperCase():null;
+}
+async function detener(){
+  if(lector){
+    try{if(activo)await lector.stop();}catch(e){}
+    try{await lector.clear();}catch(e){}
+  }
+  lector=null;activo=false;
+  $('start').textContent='📷 Iniciar escáner';
+}
+async function iniciar(){
+  if(activo){await detener();return;}
+  const url=$('webapp').value.trim();
+  const clave=$('clave').value;
+  if(!url||!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(url)){
+    mensaje('Ingresa la URL completa de implementación de Apps Script, terminada en /exec.');return;
+  }
+  if(!clave){mensaje('Ingresa la clave del personal.');return;}
+  try{localStorage.setItem('appScriptWebApp',url);}catch(e){}
+  $('start').disabled=true;
+  $('start').textContent='Solicitando cámara…';
+  try{
+    // Solicitar permiso explícitamente al navegador tras el clic.
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    stream.getTracks().forEach(t=>t.stop());
+
+    lector=new Html5Qrcode('reader');
+    await lector.start(
+      {facingMode:'environment'},
+      {fps:10,qrbox:{width:250,height:250}},
+      async texto=>{
+        if(procesando)return;
+        procesando=true;
+        const codigo=extraerCodigo(texto);
+        if(!codigo){
+          mensaje('El QR no contiene un código de tarjeta reconocido.');
+          procesando=false;return;
+        }
+        mensaje('QR leído: '+codigo+'. Registrando sello…','ok');
+        await detener();
+        enviarSello(url,codigo,clave);
+      },
+      ()=>{}
+    );
+    activo=true;
+    $('start').textContent='Detener escáner';
+    mensaje('Cámara activa. Apunta al QR del cliente.','ok');
+  }catch(e){
+    await detener();
+    let m='No se pudo iniciar la cámara.';
+    if(e.name==='NotAllowedError')m='Permiso de cámara denegado. Habilítalo en los permisos del navegador.';
+    else if(e.name==='NotFoundError')m='No se encontró una cámara disponible.';
+    else if(e.name==='NotReadableError')m='La cámara está ocupada por otra aplicación.';
+    else if(e.name==='SecurityError')m='El navegador bloqueó la cámara. Abre esta página mediante HTTPS.';
+    mensaje(m+' ('+(e.message||e.name)+')');
+  }finally{$('start').disabled=false;}
+}
+function enviarSello(url,codigo,clave){
+  // Form POST navega al Web App de Apps Script. No requiere CORS.
+  const form=document.createElement('form');
+  form.method='POST';form.action=url;form.target='_self';
+  [['accion','sellar'],['codigo',codigo],['clave',clave]].forEach(([name,value])=>{
+    const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+}
+$('start').addEventListener('click',iniciar);
+</script>
+</body>
+</html>
