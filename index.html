@@ -1,3 +1,16 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -9,12 +22,16 @@
 :root{--bg:#150b05;--gold:#e9c46a;--cream:#f6ead6;--muted:#bfa27a;--green:#4be08f;--red:#ff8a7a}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;padding:24px 14px;color:var(--cream);font:16px Arial,sans-serif;background:radial-gradient(600px 400px at 15% 0%,#563416,transparent 70%),var(--bg);display:flex;justify-content:center;align-items:flex-start}
-.panel{width:100%;max-width:520px;border:1px solid #80602b;border-radius:24px;padding:26px;background:rgba(255,255,255,.04);box-shadow:0 20px 55px #0008}
-h1{color:var(--gold);margin:0 0 8px;font-size:1.8rem}
+.panel{width:100%;max-width:560px;border:1px solid #80602b;border-radius:24px;padding:26px;background:rgba(255,255,255,.04);box-shadow:0 20px 55px #0008}
+h1{color:var(--gold);margin:0 0 8px;font-size:1.7rem}
+h2{color:var(--gold);margin:18px 0 8px;font-size:1.2rem}
 p{color:var(--muted);line-height:1.5}
-button{width:100%;padding:16px;border:0;border-radius:30px;background:linear-gradient(135deg,#fff0b8,#e9c46a,#b9862e);color:#2a1608;font-weight:bold;font-size:1.05rem;cursor:pointer;margin-top:14px;transition:transform .15s}
+label{display:block;margin:12px 0 6px;color:var(--gold);font-size:.9rem}
+input,select{width:100%;padding:12px;border-radius:12px;border:1px solid #70552b;background:#100803;color:#fff;font-size:1rem}
+button{width:100%;padding:14px;border:0;border-radius:30px;background:linear-gradient(135deg,#fff0b8,#e9c46a,#b9862e);color:#2a1608;font-weight:bold;font-size:1rem;cursor:pointer;margin-top:14px;transition:transform .15s}
 button:hover{transform:translateY(-1px)}
 button:disabled{opacity:.55;cursor:wait;transform:none}
+button.sec{background:transparent;color:var(--gold);border:1px solid rgba(233,196,106,.5)}
 #reader{margin-top:16px;overflow:hidden;border-radius:16px;background:#050302;display:none}
 #reader.ver{display:block}
 #status{margin-top:15px;padding:15px;border-radius:12px;display:none;line-height:1.5;overflow-wrap:anywhere}
@@ -26,93 +43,155 @@ button:disabled{opacity:.55;cursor:wait;transform:none}
 .small{font-size:.78rem;color:#9e8666;margin-top:12px}
 #volver{display:none;background:transparent;color:var(--gold);border:1px solid rgba(233,196,106,.5);box-shadow:none}
 #volver.ver{display:block}
+.tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.tabs button{width:auto;flex:1;margin:0;padding:10px 14px;font-size:.9rem}
+.tabs button.act{background:linear-gradient(135deg,#fff0b8,#e9c46a,#b9862e);color:#2a1608}
+.tabs button:not(.act){background:transparent;color:var(--gold);border:1px solid rgba(233,196,106,.4)}
+.tab{display:none}.tab.ver{display:block}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.85rem}
+th,td{padding:6px;border-bottom:1px solid #3a2a18;text-align:left}
+th{color:var(--gold)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal.ver{display:flex}
+.modal .caja{background:#241408;border:1px solid #e9c46a;border-radius:18px;padding:24px;max-width:400px;width:100%}
+.modal h3{color:var(--gold);margin:0 0 10px}
+.modal .acciones{display:flex;gap:10px;margin-top:18px}
+.modal .acciones button{margin:0}
+.modal .acciones .no{background:transparent;color:var(--gold);border:1px solid rgba(233,196,106,.5)}
 @media(min-width:600px){body{align-items:center}.panel{padding:32px}h1{font-size:2rem}}
 </style>
 </head>
 <body>
 <main class="panel">
   <h1>Escáner de fidelización</h1>
-  <p id="intro">Pulsa el botón y apunta al QR de la tarjeta del cliente. El sello se registra automáticamente.</p>
 
-  <button id="start">📷 Escanear</button>
-  <div id="reader"></div>
-  <div id="status" role="status"></div>
-  <button id="volver">🔄 Volver a escanear</button>
+  <!-- LOGIN -->
+  <div id="vLogin">
+    <p>Inicia sesión con tu usuario para aprobar sellos.</p>
+    <label for="u">Usuario</label><input id="u" autocomplete="username">
+    <label for="k">Contraseña</label><input id="k" type="password" autocomplete="current-password">
+    <button id="btnLogin">Iniciar sesión</button>
+    <div id="msgLogin" class="small"></div>
+  </div>
 
-  <p class="small">La cámara requiere HTTPS y permiso del navegador.</p>
+  <!-- SESIÓN -->
+  <div id="vSesion" style="display:none">
+    <p id="quien" class="small"></p>
+    <div class="tabs" id="tabs">
+      <button data-tab="scan" class="act">Escanear</button>
+      <button data-tab="admin" id="tabAdmin" style="display:none">Admin</button>
+      <button data-tab="salir" id="tabSalir">Salir</button>
+    </div>
+
+    <!-- TAB ESCANEAR -->
+    <div class="tab ver" id="tab-scan">
+      <button id="start">📷 Escanear</button>
+      <div id="reader"></div>
+      <div id="status" role="status"></div>
+      <button id="volver">🔄 Volver a escanear</button>
+      <button id="btnRest" class="sec" style="display:none">♻️ Restablecer tarjeta</button>
+      <p class="small">La cámara requiere HTTPS y permiso del navegador.</p>
+    </div>
+
+    <!-- TAB ADMIN -->
+    <div class="tab" id="tab-admin">
+      <h2>Clientes</h2>
+      <div id="listaClientes"></div>
+      <h2>Historial</h2>
+      <div id="listaHistorial"></div>
+      <h2>Roles habilitados para aprobar sellos</h2>
+      <div id="listaRoles"></div>
+      <button id="btnGuardarRoles">Guardar roles</button>
+    </div>
+
+    <!-- TAB SALIR -->
+    <div class="tab" id="tab-salir">
+      <p>¿Cerrar sesión?</p>
+      <button id="btnSalir">Cerrar sesión</button>
+    </div>
+  </div>
 </main>
+
+<!-- MODAL RESTABLECER -->
+<div class="modal" id="modalRest">
+  <div class="caja">
+    <h3>¿Restablecer tarjeta?</h3>
+    <p>Se borrarán todos los sellos del cliente. Esta acción enviará un correo al administrador.</p>
+    <div class="acciones">
+      <button class="no" id="restNo">Cancelar</button>
+      <button id="restSi">Sí, restablecer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ============================================================
-   URL del Web App de Apps Script (reemplaza la de abajo por la tuya)
-   Debe terminar en /exec
+   URL del Web App de Apps Script (reemplaza por la tuya /exec)
    ============================================================ */
 const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzEyAx-nAUCn3cqRzqpZUSFhplLzJMAeGcX5vMHwZ6JMJ2Qby2b25BSPzW2vrF3K_0/exec';
 
 const $ = id => document.getElementById(id);
 let lector = null, activo = false, procesando = false;
+let sesion = { usuario: '', clave: '', rol: '' };
+let ultimoCodigo = '';
+
+function guardarSesion() {
+  try { localStorage.setItem('ses', JSON.stringify(sesion)); } catch (e) {}
+}
+function cargarSesion() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ses') || 'null');
+    if (s && s.usuario && s.clave) { sesion = s; return true; }
+  } catch (e) {}
+  return false;
+}
+function limpiarSesion() {
+  try { localStorage.removeItem('ses'); } catch (e) {}
+  sesion = { usuario: '', clave: '', rol: '' };
+}
 
 function mensaje(html, tipo='err'){
-  const s = $('status');
-  s.className = tipo;
-  s.innerHTML = html;
+  const s = $('status'); s.className = tipo; s.innerHTML = html;
 }
 
 function extraerCodigo(texto){
-  // El QR de la tarjeta contiene la URL de Apps Script con ?page=escanear&codigo=...
-  try{
-    const u = new URL(texto);
-    const codigo = u.searchParams.get('codigo');
-    if(codigo) return codigo.trim().toUpperCase();
-  }catch(e){}
-  // También acepta QR que contengan directamente el código tipo AB-1234
+  try { const u = new URL(texto); const c = u.searchParams.get('codigo'); if (c) return c.trim().toUpperCase(); } catch (e) {}
   const m = texto.trim().match(/[A-Z]{2}-\d{4}/i);
   return m ? m[0].toUpperCase() : null;
 }
 
 async function detener(){
-  if(lector){
-    try{ if(activo) await lector.stop(); }catch(e){}
-    try{ await lector.clear(); }catch(e){}
+  if (lector) {
+    try { if (activo) await lector.stop(); } catch (e) {}
+    try { await lector.clear(); } catch (e) {}
   }
-  lector = null;
-  activo = false;
+  lector = null; activo = false;
   $('reader').classList.remove('ver');
   $('start').textContent = '📷 Escanear';
   $('start').disabled = false;
 }
 
 async function iniciar(){
-  if(activo){ await detener(); return; }
-
-  $('status').className = '';
-  $('status').innerHTML = '';
+  if (activo) { await detener(); return; }
+  $('status').className = ''; $('status').innerHTML = '';
   $('volver').classList.remove('ver');
-  $('intro').style.display = '';
+  $('btnRest').style.display = 'none';
   $('start').disabled = true;
   $('start').textContent = 'Solicitando cámara…';
-
   try{
-    // Pedir permiso explícito tras el clic
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:{ ideal:'environment' } }, audio:false
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } }, audio:false });
     stream.getTracks().forEach(t => t.stop());
-
     lector = new Html5Qrcode('reader');
     $('reader').classList.add('ver');
-
     await lector.start(
       { facingMode:'environment' },
       { fps:10, qrbox:{ width:250, height:250 } },
       async texto => {
-        if(procesando) return;
+        if (procesando) return;
         procesando = true;
         const codigo = extraerCodigo(texto);
-        if(!codigo){
-          mensaje('El QR no contiene un código de tarjeta reconocido.', 'err');
-          procesando = false;
-          return;
-        }
+        if (!codigo) { mensaje('El QR no contiene un código de tarjeta reconocido.', 'err'); procesando = false; return; }
+        ultimoCodigo = codigo;
         mensaje('QR leído: <b>'+codigo+'</b>. Registrando sello…', 'ok');
         await detener();
         enviarSello(codigo);
@@ -125,74 +204,223 @@ async function iniciar(){
   }catch(e){
     await detener();
     let m = 'No se pudo iniciar la cámara.';
-    if(e.name === 'NotAllowedError') m = 'Permiso de cámara denegado. Habilítalo en los permisos del navegador.';
-    else if(e.name === 'NotFoundError') m = 'No se encontró una cámara disponible.';
-    else if(e.name === 'NotReadableError') m = 'La cámara está ocupada por otra aplicación.';
-    else if(e.name === 'SecurityError') m = 'El navegador bloqueó la cámara. Abre esta página mediante HTTPS.';
-    mensaje(m + ' ('+(e.message||e.name)+')', 'err');
+    if (e.name === 'NotAllowedError') m = 'Permiso de cámara denegado.';
+    else if (e.name === 'NotFoundError') m = 'No se encontró cámara.';
+    else if (e.name === 'NotReadableError') m = 'La cámara está ocupada.';
+    else if (e.name === 'SecurityError') m = 'Abre esta página por HTTPS.';
+    mensaje(m, 'err');
     $('start').disabled = false;
   }
 }
 
 function enviarSello(codigo){
-  // 1) POST sin clave, en segundo plano (no navega)
-  const fd = new FormData();
+  const fd = new URLSearchParams();
   fd.append('accion', 'sellar_publico');
   fd.append('codigo', codigo);
-
-  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', body:fd })
+  fd.append('usuario', sesion.usuario);
+  fd.append('clave', sesion.clave);
+  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
     .then(() => consultarResultado(codigo))
     .catch(() => consultarResultado(codigo));
 }
 
 function consultarResultado(codigo){
-  // 2) GET al endpoint JSON para leer nombre y sellos actuales
   const url = WEBAPP_URL + '?page=api&codigo=' + encodeURIComponent(codigo);
-  fetch(url)
-    .then(r => r.json())
-    .then(r => pintarResultado(r, codigo))
-    .catch(() => {
-      // Si el GET falla (CORS), mostramos mensaje genérico pero permitimos reintentar
-      mensaje('<b>Sello enviado</b><div class="linea">No se pudo leer el resultado, pero el sello fue registrado. Código: '+codigo+'.</div>', 'ok');
-      $('intro').style.display = 'none';
-      $('volver').classList.add('ver');
-      $('start').style.display = 'none';
-    });
+  fetch(url).then(r => r.json()).then(r => pintarResultado(r, codigo)).catch(() => {
+    mensaje('<b>Sello enviado</b><div class="linea">No se pudo leer el resultado. Código: '+codigo+'.</div>', 'ok');
+    $('volver').classList.add('ver');
+    $('start').style.display = 'none';
+  });
 }
 
 function pintarResultado(r, codigo){
-  $('intro').style.display = 'none';
   $('start').style.display = 'none';
   $('volver').classList.add('ver');
-
-  if(!r || !r.ok){
-    mensaje('<b>No se pudo registrar el sello</b><div class="linea">'+
-      (r && r.error ? r.error : 'Código: '+codigo)+'</div>', 'err');
+  if (!r || !r.ok) {
+    mensaje('<b>No se pudo registrar el sello</b><div class="linea">'+(r && r.error ? r.error : 'Código: '+codigo)+'</div>', 'err');
     return;
   }
-
-  if(r.premio){
-    mensaje('<b>🎁 ¡Premio obtenido!</b><div class="linea">Cliente: <b>'+r.nombre+
-      '</b></div><div class="linea">Completó su tarjeta. Entrega un plato de obsequio.</div>', 'premio');
-  }else{
-    mensaje('<b>✓ Sello agregado</b><div class="linea">Cliente: <b>'+r.nombre+
-      '</b></div><div class="linea">Sellos registrados: <b>'+r.sellos+' de '+r.meta+'</b></div>'+
-      '<div class="linea">Ya puedes regresar al escáner.</div>', 'ok');
+  if (r.premio) {
+    mensaje('<b>🎁 ¡Premio obtenido!</b><div class="linea">Cliente: <b>'+r.nombre+'</b></div><div class="linea">Entrega un plato de obsequio.</div>', 'premio');
+  } else {
+    mensaje('<b>✓ Sello agregado</b><div class="linea">Cliente: <b>'+r.nombre+'</b></div><div class="linea">Sellos registrados: <b>'+r.sellos+' de '+r.meta+'</b></div><div class="linea">Ya puedes regresar al escáner.</div>', 'ok');
   }
+  $('btnRest').style.display = 'block';
 }
 
 function volverEscanear(){
-  $('status').className = '';
-  $('status').innerHTML = '';
+  $('status').className=''; $('status').innerHTML='';
   $('volver').classList.remove('ver');
   $('start').style.display = '';
-  $('intro').style.display = '';
+  $('btnRest').style.display = 'none';
   procesando = false;
   iniciar();
 }
 
+/* ===== LOGIN ===== */
+$('btnLogin').onclick = () => {
+  const usuario = $('u').value.trim(), clave = $('k').value;
+  if (!usuario || !clave) { $('msgLogin').textContent = 'Escribe usuario y contraseña.'; return; }
+  $('btnLogin').disabled = true;
+  $('msgLogin').textContent = 'Validando…';
+  const fd = new URLSearchParams();
+  fd.append('accion','login'); fd.append('usuario', usuario); fd.append('clave', clave);
+  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
+    .then(() => fetch(WEBAPP_URL + '?page=api&codigo=&login=1&usuario=' + encodeURIComponent(usuario) + '&clave=' + encodeURIComponent(clave)))
+    .then(r => r.json())
+    .then(r => {
+      $('btnLogin').disabled = false;
+      if (!r.ok) { $('msgLogin').textContent = r.error || 'No se pudo iniciar sesión.'; return; }
+      sesion = { usuario: r.usuario, clave: clave, rol: r.rol };
+      guardarSesion();
+      entrarSesion();
+    })
+    .catch(() => { $('btnLogin').disabled = false; $('msgLogin').textContent = 'Error de conexión.'; });
+};
+
+function entrarSesion(){
+  $('vLogin').style.display = 'none';
+  $('vSesion').style.display = 'block';
+  $('quien').textContent = 'Sesión: ' + sesion.usuario + ' · ' + sesion.rol;
+  $('tabAdmin').style.display = (sesion.rol === 'Administrador') ? '' : 'none';
+}
+
+function salir(){
+  limpiarSesion();
+  detener();
+  $('vSesion').style.display = 'none';
+  $('vLogin').style.display = 'block';
+  $('u').value = ''; $('k').value = ''; $('msgLogin').textContent = '';
+}
+
+/* ===== TABS ===== */
+document.querySelectorAll('#tabs button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('act'));
+    b.classList.add('act');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('ver'));
+    const id = b.dataset.tab;
+    if (id === 'salir') { $('tab-salir').classList.add('ver'); return; }
+    $('tab-' + id).classList.add('ver');
+    if (id === 'admin') cargarAdmin();
+  };
+});
+
+/* ===== RESTABLECER ===== */
+$('btnRest').onclick = () => { $('modalRest').classList.add('ver'); };
+$('restNo').onclick = () => { $('modalRest').classList.remove('ver'); };
+$('restSi').onclick = () => {
+  $('modalRest').classList.remove('ver');
+  const fd = new URLSearchParams();
+  fd.append('accion','restablecer'); fd.append('codigo', ultimoCodigo);
+  fd.append('usuario', sesion.usuario); fd.append('clave', sesion.clave);
+  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
+    .then(() => {
+      mensaje('<b>♻️ Tarjeta restablecida</b><div class="linea">Se envió el correo al administrador.</div>', 'ok');
+      $('btnRest').style.display = 'none';
+    })
+    .catch(() => mensaje('No se pudo restablecer la tarjeta.', 'err'));
+};
+
+/* ===== ADMIN ===== */
+function cargarAdmin(){
+  cargarClientes(); cargarHistorial(); cargarRoles();
+}
+function apiAdmin(accion, extra){
+  const fd = new URLSearchParams();
+  fd.append('accion', accion); fd.append('usuario', sesion.usuario); fd.append('clave', sesion.clave);
+  Object.keys(extra || {}).forEach(k => fd.append(k, extra[k]));
+  return fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
+    .then(() => {
+      // Como no-cors no permite leer respuesta, usamos GET api con accion admin
+      const g = new URLSearchParams();
+      g.append('page','api'); g.append('admin', accion);
+      g.append('usuario', sesion.usuario); g.append('clave', sesion.clave);
+      Object.keys(extra || {}).forEach(k => g.append(k, extra[k]));
+      return fetch(WEBAPP_URL + '?' + g.toString()).then(r => r.json());
+    });
+}
+function cargarClientes(){
+  apiAdmin('admin_clientes').then(r => {
+    if (!r.ok) { $('listaClientes').innerHTML = '<p>'+r.error+'</p>'; return; }
+    let html = '<table><tr><th>Fila</th><th>Nombre</th><th>Email</th><th>Teléfono</th><th>Sellos</th><th>Estado</th><th>Código</th><th></th></tr>';
+    r.clientes.forEach(c => {
+      html += '<tr data-fila="'+c.fila+'"><td>'+c.fila+'</td><td><input value="'+c.nombre+'"></td><td><input value="'+c.email+'"></td><td><input value="'+c.telefono+'"></td><td>'+c.sellos+'</td><td><input value="'+c.estado+'"></td><td>'+c.codigo+'</td><td><button class="sec" data-guardar="'+c.fila+'">Guardar</button></td></tr>';
+    });
+    html += '</table>';
+    $('listaClientes').innerHTML = html;
+    $('listaClientes').querySelectorAll('[data-guardar]').forEach(b => {
+      b.onclick = () => {
+        const tr = b.closest('tr');
+        const inputs = tr.querySelectorAll('input');
+        const datos = { nombre: inputs[0].value, email: inputs[1].value, telefono: inputs[2].value, estado: inputs[3].value };
+        apiAdmin('admin_editar_cliente', { fila: b.dataset.guardar, datos: JSON.stringify(datos) })
+          .then(r2 => { if (r2.ok) alert('Cliente actualizado.'); else alert(r2.error); });
+      };
+    });
+  });
+}
+function cargarHistorial(){
+  apiAdmin('admin_historial').then(r => {
+    if (!r.ok) { $('listaHistorial').innerHTML = '<p>'+r.error+'</p>'; return; }
+    let html = '<table><tr><th>Fila</th><th>Fecha</th><th>Código</th><th>Acción</th><th>Sellos</th><th>Anulado</th><th></th></tr>';
+    r.historial.forEach(h => {
+      html += '<tr><td>'+h.fila+'</td><td>'+h.fecha+'</td><td>'+h.codigo+'</td><td>'+h.accion+'</td><td>'+h.sellos+'</td><td>'+h.anulado+'</td><td>'+(h.anulado==='SI'?'':('<button class="sec" data-anular="'+h.fila+'">Anular</button>'))+'</td></tr>';
+    });
+    html += '</table>';
+    $('listaHistorial').innerHTML = html;
+    $('listaHistorial').querySelectorAll('[data-anular]').forEach(b => {
+      b.onclick = () => {
+        if (!confirm('¿Anular este registro?')) return;
+        apiAdmin('admin_anular_historial', { fila: b.dataset.anular })
+          .then(r2 => { if (r2.ok) cargarHistorial(); else alert(r2.error); });
+      };
+    });
+  });
+}
+function cargarRoles(){
+  apiAdmin('admin_roles_listar').then(r => {
+    if (!r.ok) { $('listaRoles').innerHTML = '<p>'+r.error+'</p>'; return; }
+    let html = '';
+    r.roles.forEach(x => {
+      html += '<label><input type="checkbox" data-rol="'+x.rol+'" '+(x.habilitado?'checked':'')+'> '+x.rol+'</label>';
+    });
+    $('listaRoles').innerHTML = html;
+  });
+}
+$('btnGuardarRoles').onclick = () => {
+  const roles = [];
+  $('listaRoles').querySelectorAll('[data-rol]').forEach(c => roles.push({ rol: c.dataset.rol, habilitado: c.checked }));
+  apiAdmin('admin_roles_guardar', { roles: JSON.stringify(roles) })
+    .then(r => { if (r.ok) alert('Roles guardados.'); else alert(r.error); });
+};
+
+/* ===== INIT ===== */
 $('start').addEventListener('click', iniciar);
 $('volver').addEventListener('click', volverEscanear);
+$('btnSalir').onclick = salir;
+
+if (cargarSesion()) {
+  // Revalidar sesión en background
+  const fd = new URLSearchParams();
+  fd.append('accion','login'); fd.append('usuario', sesion.usuario); fd.append('clave', sesion.clave);
+  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
+    .then(() => fetch(WEBAPP_URL + '?page=api&codigo=&login=1&usuario=' + encodeURIComponent(sesion.usuario) + '&clave=' + encodeURIComponent(sesion.clave)))
+    .then(r => r.json())
+    .then(r => {
+      if (r.ok) { sesion.rol = r.rol; sesion.usuario = r.usuario; entrarSesion(); }
+      else { limpiarSesion(); }
+    })
+    .catch(() => entrarSesion());
+} else {
+  $('vLogin').style.display = 'block';
+}
 </script>
 </body>
 </html>
+
+
+
+
+
+
