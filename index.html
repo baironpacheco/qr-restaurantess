@@ -70,7 +70,6 @@ th{color:var(--gold)}
       <button data-tab="salir" id="tabSalir">Salir</button>
     </div>
 
-    <!-- TAB ESCANEAR -->
     <div class="tab ver" id="tab-scan">
       <button id="start">📷 Escanear</button>
       <div id="reader"></div>
@@ -80,18 +79,13 @@ th{color:var(--gold)}
       <p class="small">La cámara requiere HTTPS y permiso del navegador.</p>
     </div>
 
-    <!-- TAB ADMIN -->
     <div class="tab" id="tab-admin">
-      <h2>Clientes</h2>
-      <div id="listaClientes"></div>
-      <h2>Historial</h2>
-      <div id="listaHistorial"></div>
-      <h2>Roles habilitados para aprobar sellos</h2>
-      <div id="listaRoles"></div>
+      <h2>Clientes</h2><div id="listaClientes"></div>
+      <h2>Historial</h2><div id="listaHistorial"></div>
+      <h2>Roles habilitados para aprobar sellos</h2><div id="listaRoles"></div>
       <button id="btnGuardarRoles">Guardar roles</button>
     </div>
 
-    <!-- TAB SALIR -->
     <div class="tab" id="tab-salir">
       <p>¿Cerrar sesión?</p>
       <button id="btnSalir">Cerrar sesión</button>
@@ -99,7 +93,6 @@ th{color:var(--gold)}
   </div>
 </main>
 
-<!-- MODAL RESTABLECER -->
 <div class="modal" id="modalRest">
   <div class="caja">
     <h3>¿Restablecer tarjeta?</h3>
@@ -122,9 +115,7 @@ let lector = null, activo = false, procesando = false;
 let sesion = { usuario: '', clave: '', rol: '' };
 let ultimoCodigo = '';
 
-function guardarSesion() {
-  try { localStorage.setItem('ses', JSON.stringify(sesion)); } catch (e) {}
-}
+function guardarSesion() { try { localStorage.setItem('ses', JSON.stringify(sesion)); } catch (e) {} }
 function cargarSesion() {
   try {
     const s = JSON.parse(localStorage.getItem('ses') || 'null');
@@ -132,14 +123,9 @@ function cargarSesion() {
   } catch (e) {}
   return false;
 }
-function limpiarSesion() {
-  try { localStorage.removeItem('ses'); } catch (e) {}
-  sesion = { usuario: '', clave: '', rol: '' };
-}
+function limpiarSesion() { try { localStorage.removeItem('ses'); } catch (e) {} sesion = { usuario: '', clave: '', rol: '' }; }
 
-function mensaje(html, tipo='err'){
-  const s = $('status'); s.className = tipo; s.innerHTML = html;
-}
+function mensaje(html, tipo='err') { const s = $('status'); s.className = tipo; s.innerHTML = html; }
 
 function extraerCodigo(texto){
   try { const u = new URL(texto); const c = u.searchParams.get('codigo'); if (c) return c.trim().toUpperCase(); } catch (e) {}
@@ -148,10 +134,7 @@ function extraerCodigo(texto){
 }
 
 async function detener(){
-  if (lector) {
-    try { if (activo) await lector.stop(); } catch (e) {}
-    try { await lector.clear(); } catch (e) {}
-  }
+  if (lector) { try { if (activo) await lector.stop(); } catch (e) {} try { await lector.clear(); } catch (e) {} }
   lector = null; activo = false;
   $('reader').classList.remove('ver');
   $('start').textContent = '📷 Escanear';
@@ -245,24 +228,26 @@ function volverEscanear(){
 }
 
 /* ===== LOGIN ===== */
+function validarLogin(usuario, clave){
+  return fetch(WEBAPP_URL + '?page=api&login=1&usuario=' + encodeURIComponent(usuario) + '&clave=' + encodeURIComponent(clave))
+    .then(r => r.json());
+}
+
 $('btnLogin').onclick = () => {
   const usuario = $('u').value.trim(), clave = $('k').value;
   if (!usuario || !clave) { $('msgLogin').textContent = 'Escribe usuario y contraseña.'; return; }
   $('btnLogin').disabled = true;
   $('msgLogin').textContent = 'Validando…';
-  const fd = new URLSearchParams();
-  fd.append('accion','login'); fd.append('usuario', usuario); fd.append('clave', clave);
-  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
-    .then(() => fetch(WEBAPP_URL + '?page=api&codigo=&login=1&usuario=' + encodeURIComponent(usuario) + '&clave=' + encodeURIComponent(clave)))
-    .then(r => r.json())
-    .then(r => {
-      $('btnLogin').disabled = false;
-      if (!r.ok) { $('msgLogin').textContent = r.error || 'No se pudo iniciar sesión.'; return; }
-      sesion = { usuario: r.usuario, clave: clave, rol: r.rol };
-      guardarSesion();
-      entrarSesion();
-    })
-    .catch(() => { $('btnLogin').disabled = false; $('msgLogin').textContent = 'Error de conexión.'; });
+  validarLogin(usuario, clave).then(r => {
+    $('btnLogin').disabled = false;
+    if (!r.ok) { $('msgLogin').textContent = r.error || 'No se pudo iniciar sesión.'; return; }
+    sesion = { usuario: r.usuario, clave: clave, rol: r.rol };
+    guardarSesion();
+    entrarSesion();
+  }).catch(() => {
+    $('btnLogin').disabled = false;
+    $('msgLogin').textContent = 'Error de conexión. Revisa la URL del Web App.';
+  });
 };
 
 function entrarSesion(){
@@ -273,8 +258,7 @@ function entrarSesion(){
 }
 
 function salir(){
-  limpiarSesion();
-  detener();
+  limpiarSesion(); detener();
   $('vSesion').style.display = 'none';
   $('vLogin').style.display = 'block';
   $('u').value = ''; $('k').value = ''; $('msgLogin').textContent = '';
@@ -310,25 +294,24 @@ $('restSi').onclick = () => {
 };
 
 /* ===== ADMIN ===== */
-function cargarAdmin(){
-  cargarClientes(); cargarHistorial(); cargarRoles();
+function cargarAdmin(){ cargarClientes(); cargarHistorial(); cargarRoles(); }
+
+function apiAdminGet(accion, extra){
+  const g = new URLSearchParams();
+  g.append('page','api'); g.append('admin', accion);
+  g.append('usuario', sesion.usuario); g.append('clave', sesion.clave);
+  Object.keys(extra || {}).forEach(k => g.append(k, extra[k]));
+  return fetch(WEBAPP_URL + '?' + g.toString()).then(r => r.json());
 }
-function apiAdmin(accion, extra){
+function apiAdminPost(accion, extra){
   const fd = new URLSearchParams();
   fd.append('accion', accion); fd.append('usuario', sesion.usuario); fd.append('clave', sesion.clave);
   Object.keys(extra || {}).forEach(k => fd.append(k, extra[k]));
-  return fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
-    .then(() => {
-      // Como no-cors no permite leer respuesta, usamos GET api con accion admin
-      const g = new URLSearchParams();
-      g.append('page','api'); g.append('admin', accion);
-      g.append('usuario', sesion.usuario); g.append('clave', sesion.clave);
-      Object.keys(extra || {}).forEach(k => g.append(k, extra[k]));
-      return fetch(WEBAPP_URL + '?' + g.toString()).then(r => r.json());
-    });
+  return fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() });
 }
+
 function cargarClientes(){
-  apiAdmin('admin_clientes').then(r => {
+  apiAdminGet('admin_clientes').then(r => {
     if (!r.ok) { $('listaClientes').innerHTML = '<p>'+r.error+'</p>'; return; }
     let html = '<table><tr><th>Fila</th><th>Nombre</th><th>Email</th><th>Teléfono</th><th>Sellos</th><th>Estado</th><th>Código</th><th></th></tr>';
     r.clientes.forEach(c => {
@@ -338,17 +321,17 @@ function cargarClientes(){
     $('listaClientes').innerHTML = html;
     $('listaClientes').querySelectorAll('[data-guardar]').forEach(b => {
       b.onclick = () => {
-        const tr = b.closest('tr');
-        const inputs = tr.querySelectorAll('input');
-        const datos = { nombre: inputs[0].value, email: inputs[1].value, telefono: inputs[2].value, estado: inputs[3].value };
-        apiAdmin('admin_editar_cliente', { fila: b.dataset.guardar, datos: JSON.stringify(datos) })
-          .then(r2 => { if (r2.ok) alert('Cliente actualizado.'); else alert(r2.error); });
+        const tr = b.closest('tr'); const inputs = tr.querySelectorAll('input');
+        const datos = { nombre:inputs[0].value, email:inputs[1].value, telefono:inputs[2].value, estado:inputs[3].value };
+        apiAdminPost('admin_editar_cliente', { fila: b.dataset.guardar, datos: JSON.stringify(datos) })
+          .then(() => setTimeout(cargarClientes, 800));
       };
     });
-  });
+  }).catch(() => { $('listaClientes').innerHTML = '<p>Error de conexión.</p>'; });
 }
+
 function cargarHistorial(){
-  apiAdmin('admin_historial').then(r => {
+  apiAdminGet('admin_historial').then(r => {
     if (!r.ok) { $('listaHistorial').innerHTML = '<p>'+r.error+'</p>'; return; }
     let html = '<table><tr><th>Fila</th><th>Fecha</th><th>Código</th><th>Acción</th><th>Sellos</th><th>Anulado</th><th></th></tr>';
     r.historial.forEach(h => {
@@ -359,27 +342,26 @@ function cargarHistorial(){
     $('listaHistorial').querySelectorAll('[data-anular]').forEach(b => {
       b.onclick = () => {
         if (!confirm('¿Anular este registro?')) return;
-        apiAdmin('admin_anular_historial', { fila: b.dataset.anular })
-          .then(r2 => { if (r2.ok) cargarHistorial(); else alert(r2.error); });
+        apiAdminPost('admin_anular_historial', { fila: b.dataset.anular })
+          .then(() => setTimeout(cargarHistorial, 800));
       };
     });
-  });
+  }).catch(() => { $('listaHistorial').innerHTML = '<p>Error de conexión.</p>'; });
 }
+
 function cargarRoles(){
-  apiAdmin('admin_roles_listar').then(r => {
+  apiAdminGet('admin_roles_listar').then(r => {
     if (!r.ok) { $('listaRoles').innerHTML = '<p>'+r.error+'</p>'; return; }
     let html = '';
-    r.roles.forEach(x => {
-      html += '<label><input type="checkbox" data-rol="'+x.rol+'" '+(x.habilitado?'checked':'')+'> '+x.rol+'</label>';
-    });
+    r.roles.forEach(x => { html += '<label><input type="checkbox" data-rol="'+x.rol+'" '+(x.habilitado?'checked':'')+'> '+x.rol+'</label>'; });
     $('listaRoles').innerHTML = html;
-  });
+  }).catch(() => { $('listaRoles').innerHTML = '<p>Error de conexión.</p>'; });
 }
 $('btnGuardarRoles').onclick = () => {
   const roles = [];
   $('listaRoles').querySelectorAll('[data-rol]').forEach(c => roles.push({ rol: c.dataset.rol, habilitado: c.checked }));
-  apiAdmin('admin_roles_guardar', { roles: JSON.stringify(roles) })
-    .then(r => { if (r.ok) alert('Roles guardados.'); else alert(r.error); });
+  apiAdminPost('admin_roles_guardar', { roles: JSON.stringify(roles) })
+    .then(() => alert('Roles guardados.'));
 };
 
 /* ===== INIT ===== */
@@ -388,17 +370,10 @@ $('volver').addEventListener('click', volverEscanear);
 $('btnSalir').onclick = salir;
 
 if (cargarSesion()) {
-  // Revalidar sesión en background
-  const fd = new URLSearchParams();
-  fd.append('accion','login'); fd.append('usuario', sesion.usuario); fd.append('clave', sesion.clave);
-  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:fd.toString() })
-    .then(() => fetch(WEBAPP_URL + '?page=api&codigo=&login=1&usuario=' + encodeURIComponent(sesion.usuario) + '&clave=' + encodeURIComponent(sesion.clave)))
-    .then(r => r.json())
-    .then(r => {
-      if (r.ok) { sesion.rol = r.rol; sesion.usuario = r.usuario; entrarSesion(); }
-      else { limpiarSesion(); }
-    })
-    .catch(() => entrarSesion());
+  validarLogin(sesion.usuario, sesion.clave).then(r => {
+    if (r.ok) { sesion.rol = r.rol; sesion.usuario = r.usuario; entrarSesion(); }
+    else { limpiarSesion(); $('vLogin').style.display = 'block'; }
+  }).catch(() => { $('vLogin').style.display = 'block'; });
 } else {
   $('vLogin').style.display = 'block';
 }
