@@ -7,122 +7,192 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root{--bg:#150b05;--gold:#e9c46a;--cream:#f6ead6;--muted:#bfa27a;--green:#4be08f;--red:#ff8a7a}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:24px 14px;color:var(--cream);font:16px Arial,sans-serif;background:radial-gradient(600px 400px at 15% 0%,#563416,transparent 70%),var(--bg);display:flex;justify-content:center;align-items:center}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:24px 14px;color:var(--cream);font:16px Arial,sans-serif;background:radial-gradient(600px 400px at 15% 0%,#563416,transparent 70%),var(--bg);display:flex;justify-content:center;align-items:flex-start}
 .panel{width:100%;max-width:520px;border:1px solid #80602b;border-radius:24px;padding:26px;background:rgba(255,255,255,.04);box-shadow:0 20px 55px #0008}
-h1{color:var(--gold);margin:0 0 8px;font-size:1.8rem}p{color:var(--muted);line-height:1.5}
-label{display:block;margin:16px 0 7px;color:var(--gold);font-size:.9rem}
-input{width:100%;padding:13px;border-radius:12px;border:1px solid #70552b;background:#100803;color:#fff;font-size:1rem}
-button{width:100%;padding:14px;border:0;border-radius:30px;background:linear-gradient(135deg,#fff0b8,#e9c46a,#b9862e);color:#2a1608;font-weight:bold;font-size:1rem;cursor:pointer;margin-top:14px}
-button:disabled{opacity:.55;cursor:wait}
-#reader{margin-top:16px;overflow:hidden;border-radius:16px;background:#050302}
-#status{margin-top:15px;padding:13px;border-radius:12px;display:none;line-height:1.45;overflow-wrap:anywhere}
+h1{color:var(--gold);margin:0 0 8px;font-size:1.8rem}
+p{color:var(--muted);line-height:1.5}
+button{width:100%;padding:16px;border:0;border-radius:30px;background:linear-gradient(135deg,#fff0b8,#e9c46a,#b9862e);color:#2a1608;font-weight:bold;font-size:1.05rem;cursor:pointer;margin-top:14px;transition:transform .15s}
+button:hover{transform:translateY(-1px)}
+button:disabled{opacity:.55;cursor:wait;transform:none}
+#reader{margin-top:16px;overflow:hidden;border-radius:16px;background:#050302;display:none}
+#reader.ver{display:block}
+#status{margin-top:15px;padding:15px;border-radius:12px;display:none;line-height:1.5;overflow-wrap:anywhere}
 #status.ok{display:block;background:#163c29;border:1px solid var(--green);color:#d8ffe8}
 #status.err{display:block;background:#401d18;border:1px solid var(--red);color:#ffe4df}
-.small{font-size:.8rem;color:#9e8666}
+#status.premio{display:block;background:linear-gradient(135deg,#fff0b8,#e9c46a 60%,#c8922f);border:1px solid #c8922f;color:#2a1608;font-weight:500}
+#status b{display:block;font-size:1.15rem;margin-bottom:4px}
+#status .linea{margin-top:6px;font-size:.92rem}
+.small{font-size:.78rem;color:#9e8666;margin-top:12px}
+#volver{display:none;background:transparent;color:var(--gold);border:1px solid rgba(233,196,106,.5);box-shadow:none}
+#volver.ver{display:block}
+@media(min-width:600px){body{align-items:center}.panel{padding:32px}h1{font-size:2rem}}
 </style>
 </head>
 <body>
 <main class="panel">
-<h1>Escáner de fidelización</h1>
-<p>Escanea el QR de la tarjeta del cliente. El sello se registrará en tu sistema de Google Apps Script.</p>
+  <h1>Escáner de fidelización</h1>
+  <p id="intro">Pulsa el botón y apunta al QR de la tarjeta del cliente. El sello se registra automáticamente.</p>
 
-<label for="webapp">URL de implementación de Apps Script</label>
-<input id="webapp" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="url">
+  <button id="start">📷 Escanear</button>
+  <div id="reader"></div>
+  <div id="status" role="status"></div>
+  <button id="volver">🔄 Volver a escanear</button>
 
-<label for="clave">Clave del personal</label>
-<input id="clave" type="password" placeholder="Ingresa la clave de sellado" autocomplete="current-password">
-
-<button id="start">📷 Iniciar escáner</button>
-<div id="reader"></div>
-<div id="status" role="status"></div>
-<p class="small">La cámara requiere HTTPS y permiso del navegador. La clave se envía mediante POST al sistema; no se incluye en la URL.</p>
+  <p class="small">La cámara requiere HTTPS y permiso del navegador.</p>
 </main>
 <script>
-const $=id=>document.getElementById(id);
-let lector=null,activo=false,procesando=false;
-try{$('webapp').value=localStorage.getItem('appScriptWebApp')||'';}catch(e){}
+/* ============================================================
+   URL del Web App de Apps Script (reemplaza la de abajo por la tuya)
+   Debe terminar en /exec
+   ============================================================ */
+const WEBAPP_URL = 'https://script.google.com/macros/s/XXXXXXXXXXXX/exec';
 
-function mensaje(texto,tipo='err'){
-  $('status').className=tipo;
-  $('status').textContent=texto;
+const $ = id => document.getElementById(id);
+let lector = null, activo = false, procesando = false;
+
+function mensaje(html, tipo='err'){
+  const s = $('status');
+  s.className = tipo;
+  s.innerHTML = html;
 }
+
 function extraerCodigo(texto){
-  // El QR actual de la tarjeta contiene la URL de Apps Script con ?page=escanear&codigo=...
+  // El QR de la tarjeta contiene la URL de Apps Script con ?page=escanear&codigo=...
   try{
-    const u=new URL(texto);
-    const codigo=u.searchParams.get('codigo');
-    if(codigo)return codigo.trim().toUpperCase();
+    const u = new URL(texto);
+    const codigo = u.searchParams.get('codigo');
+    if(codigo) return codigo.trim().toUpperCase();
   }catch(e){}
-  // También acepta QR que contenga directamente el código tipo AB-1234
-  const m=texto.trim().match(/[A-Z]{2}-\d{4}/i);
-  return m?m[0].toUpperCase():null;
+  // También acepta QR que contengan directamente el código tipo AB-1234
+  const m = texto.trim().match(/[A-Z]{2}-\d{4}/i);
+  return m ? m[0].toUpperCase() : null;
 }
+
 async function detener(){
   if(lector){
-    try{if(activo)await lector.stop();}catch(e){}
-    try{await lector.clear();}catch(e){}
+    try{ if(activo) await lector.stop(); }catch(e){}
+    try{ await lector.clear(); }catch(e){}
   }
-  lector=null;activo=false;
-  $('start').textContent='📷 Iniciar escáner';
+  lector = null;
+  activo = false;
+  $('reader').classList.remove('ver');
+  $('start').textContent = '📷 Escanear';
+  $('start').disabled = false;
 }
-async function iniciar(){
-  if(activo){await detener();return;}
-  const url=$('webapp').value.trim();
-  const clave=$('clave').value;
-  if(!url||!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec/.test(url)){
-    mensaje('Ingresa la URL completa de implementación de Apps Script, terminada en /exec.');return;
-  }
-  if(!clave){mensaje('Ingresa la clave del personal.');return;}
-  try{localStorage.setItem('appScriptWebApp',url);}catch(e){}
-  $('start').disabled=true;
-  $('start').textContent='Solicitando cámara…';
-  try{
-    // Solicitar permiso explícitamente al navegador tras el clic.
-    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
-    stream.getTracks().forEach(t=>t.stop());
 
-    lector=new Html5Qrcode('reader');
+async function iniciar(){
+  if(activo){ await detener(); return; }
+
+  $('status').className = '';
+  $('status').innerHTML = '';
+  $('volver').classList.remove('ver');
+  $('intro').style.display = '';
+  $('start').disabled = true;
+  $('start').textContent = 'Solicitando cámara…';
+
+  try{
+    // Pedir permiso explícito tras el clic
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ ideal:'environment' } }, audio:false
+    });
+    stream.getTracks().forEach(t => t.stop());
+
+    lector = new Html5Qrcode('reader');
+    $('reader').classList.add('ver');
+
     await lector.start(
-      {facingMode:'environment'},
-      {fps:10,qrbox:{width:250,height:250}},
-      async texto=>{
-        if(procesando)return;
-        procesando=true;
-        const codigo=extraerCodigo(texto);
+      { facingMode:'environment' },
+      { fps:10, qrbox:{ width:250, height:250 } },
+      async texto => {
+        if(procesando) return;
+        procesando = true;
+        const codigo = extraerCodigo(texto);
         if(!codigo){
-          mensaje('El QR no contiene un código de tarjeta reconocido.');
-          procesando=false;return;
+          mensaje('El QR no contiene un código de tarjeta reconocido.', 'err');
+          procesando = false;
+          return;
         }
-        mensaje('QR leído: '+codigo+'. Registrando sello…','ok');
+        mensaje('QR leído: <b>'+codigo+'</b>. Registrando sello…', 'ok');
         await detener();
-        enviarSello(url,codigo,clave);
+        enviarSello(codigo);
       },
-      ()=>{}
+      () => {}
     );
-    activo=true;
-    $('start').textContent='Detener escáner';
-    mensaje('Cámara activa. Apunta al QR del cliente.','ok');
+    activo = true;
+    $('start').textContent = 'Detener escáner';
+    $('start').disabled = false;
   }catch(e){
     await detener();
-    let m='No se pudo iniciar la cámara.';
-    if(e.name==='NotAllowedError')m='Permiso de cámara denegado. Habilítalo en los permisos del navegador.';
-    else if(e.name==='NotFoundError')m='No se encontró una cámara disponible.';
-    else if(e.name==='NotReadableError')m='La cámara está ocupada por otra aplicación.';
-    else if(e.name==='SecurityError')m='El navegador bloqueó la cámara. Abre esta página mediante HTTPS.';
-    mensaje(m+' ('+(e.message||e.name)+')');
-  }finally{$('start').disabled=false;}
+    let m = 'No se pudo iniciar la cámara.';
+    if(e.name === 'NotAllowedError') m = 'Permiso de cámara denegado. Habilítalo en los permisos del navegador.';
+    else if(e.name === 'NotFoundError') m = 'No se encontró una cámara disponible.';
+    else if(e.name === 'NotReadableError') m = 'La cámara está ocupada por otra aplicación.';
+    else if(e.name === 'SecurityError') m = 'El navegador bloqueó la cámara. Abre esta página mediante HTTPS.';
+    mensaje(m + ' ('+(e.message||e.name)+')', 'err');
+    $('start').disabled = false;
+  }
 }
-function enviarSello(url,codigo,clave){
-  // Form POST navega al Web App de Apps Script. No requiere CORS.
-  const form=document.createElement('form');
-  form.method='POST';form.action=url;form.target='_self';
-  [['accion','sellar'],['codigo',codigo],['clave',clave]].forEach(([name,value])=>{
-    const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.appendChild(input);
-  });
-  document.body.appendChild(form);
-  form.submit();
+
+function enviarSello(codigo){
+  // 1) POST sin clave, en segundo plano (no navega)
+  const fd = new FormData();
+  fd.append('accion', 'sellar_publico');
+  fd.append('codigo', codigo);
+
+  fetch(WEBAPP_URL, { method:'POST', mode:'no-cors', body:fd })
+    .then(() => consultarResultado(codigo))
+    .catch(() => consultarResultado(codigo));
 }
-$('start').addEventListener('click',iniciar);
+
+function consultarResultado(codigo){
+  // 2) GET al endpoint JSON para leer nombre y sellos actuales
+  const url = WEBAPP_URL + '?page=api&codigo=' + encodeURIComponent(codigo);
+  fetch(url)
+    .then(r => r.json())
+    .then(r => pintarResultado(r, codigo))
+    .catch(() => {
+      // Si el GET falla (CORS), mostramos mensaje genérico pero permitimos reintentar
+      mensaje('<b>Sello enviado</b><div class="linea">No se pudo leer el resultado, pero el sello fue registrado. Código: '+codigo+'.</div>', 'ok');
+      $('intro').style.display = 'none';
+      $('volver').classList.add('ver');
+      $('start').style.display = 'none';
+    });
+}
+
+function pintarResultado(r, codigo){
+  $('intro').style.display = 'none';
+  $('start').style.display = 'none';
+  $('volver').classList.add('ver');
+
+  if(!r || !r.ok){
+    mensaje('<b>No se pudo registrar el sello</b><div class="linea">'+
+      (r && r.error ? r.error : 'Código: '+codigo)+'</div>', 'err');
+    return;
+  }
+
+  if(r.premio){
+    mensaje('<b>🎁 ¡Premio obtenido!</b><div class="linea">Cliente: <b>'+r.nombre+
+      '</b></div><div class="linea">Completó su tarjeta. Entrega un plato de obsequio.</div>', 'premio');
+  }else{
+    mensaje('<b>✓ Sello agregado</b><div class="linea">Cliente: <b>'+r.nombre+
+      '</b></div><div class="linea">Sellos registrados: <b>'+r.sellos+' de '+r.meta+'</b></div>'+
+      '<div class="linea">Ya puedes regresar al escáner.</div>', 'ok');
+  }
+}
+
+function volverEscanear(){
+  $('status').className = '';
+  $('status').innerHTML = '';
+  $('volver').classList.remove('ver');
+  $('start').style.display = '';
+  $('intro').style.display = '';
+  procesando = false;
+  iniciar();
+}
+
+$('start').addEventListener('click', iniciar);
+$('volver').addEventListener('click', volverEscanear);
 </script>
 </body>
 </html>
